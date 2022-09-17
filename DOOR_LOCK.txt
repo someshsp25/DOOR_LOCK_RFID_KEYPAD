@@ -1,0 +1,167 @@
+﻿#include<Servo.h>
+#include <SPI.h>
+#include <MFRC522.h>
+#include <Wire.h> 
+#include <LiquidCrystal_I2C.h>
+#include <Keypad.h>
+
+
+/*---------KEYPAD---------*/
+#define ROW_NUM     4 // four rows
+#define COLUMN_NUM  3 // three columns
+
+char keys[ROW_NUM][COLUMN_NUM] = {
+  {'1', '2', '3'},
+  {'4', '5', '6'},
+  {'7', '8', '9'},
+  {'*', '0', '#'}
+};
+
+byte pin_rows[ROW_NUM] = {26, 14, 32,33 }; 
+byte pin_column[COLUMN_NUM] = {2, 25, 12};  
+
+
+Keypad keypad = Keypad( makeKeymap(keys), pin_rows, pin_column, ROW_NUM, COLUMN_NUM );
+
+const String password_1 = "1234"; // change your password here
+const String password_2 = "0000";  // change your password here
+const String password_3 = "1111";  // change your password here
+String input_password;
+
+
+/*------------  LCD DISPLAY----------*/
+LiquidCrystal_I2C lcd(0x27,16,2);  // set the LCD address to 0x27 for a 16 chars and 2 line display
+
+
+
+
+/*------------RFID------------------*/
+#define SS_PIN  5  // ESP32 pin GIOP5 
+#define RST_PIN 27 // ESP32 pin GIOP27 
+MFRC522 rfid(SS_PIN, RST_PIN);        // RFID OBJECT
+
+
+
+
+/*------------SERVO MOTOR------------*/
+Servo myServo;                        //define servo name
+
+
+
+
+
+ /*-----------LCD Enter-------------*/
+ void lcd_Enter()
+ {
+    lcd.print("DOOR LOCK SYSTEM");
+    delay(5000);
+    lcd.clear();
+ }
+
+
+void setup() {
+  input_password.reserve(32); // maximum input characters is 32
+  lcd.init();
+  lcd.backlight();
+  lcd_Enter();
+  Serial.begin(9600);   // Initiate a serial communication
+  SPI.begin();      // Initiate  SPI bus
+  rfid.PCD_Init();   // Initiate rfid
+  myServo.attach(13); //servo pin
+  myServo.write(0); //servo start position 
+  Serial.println();
+  lcd.clear();
+  lcd.setCursor(0,0);
+  lcd.print("ENTER PASSWORD:");
+  lcd.setCursor(0,1);
+  lcd.print("RFID OR PASSWORD");
+
+}
+
+void loop() {
+  
+  char key = keypad.getKey();
+
+  if (key) {
+    Serial.println(key);
+    
+
+    if (key == '*') {
+      input_password = ""; // reset the input password
+    } else if (key == '#') {
+      if (input_password == password_1 || input_password == password_2 || input_password == password_3) {
+        Serial.println("Valid Password => unlock the door");
+        lcd.clear();
+        lcd.print("ACCESS GRANTED");
+        myServo.write(180);
+        delay(5000);
+        myServo.write(0);
+        lcd.clear();
+        lcd.setCursor(0,0);
+        lcd.print("DOOR IS LOCKED");
+        lcd.setCursor(0,1);
+        lcd.print("RFID OR PASSWORD");
+      } else {
+        Serial.println("Invalid Password => Try again");
+        lcd.clear();
+        lcd.print("ACCESS DENIED");
+        lcd.setCursor(0,1);
+        lcd.print("RFID OR PASSWORD");
+      }
+
+      input_password = ""; // reset the input password
+    } else {
+      input_password += key; // append new character to input password string
+      }
+  }
+  else
+  {
+    // Look for new cards
+  if ( ! rfid.PICC_IsNewCardPresent()) 
+  {
+    return;
+  }
+  // Select one of the cards
+  if ( ! rfid.PICC_ReadCardSerial()) 
+  {
+    return;
+  }
+  
+  String content= "";
+  byte letter;
+  for (byte i = 0; i < rfid.uid.size; i++) 
+  {
+     Serial.print(rfid.uid.uidByte[i] < 0x10 ? " 0" : " ");
+     Serial.print(rfid.uid.uidByte[i], HEX);
+     content.concat(String(rfid.uid.uidByte[i] < 0x10 ? " 0" : " "));
+     content.concat(String(rfid.uid.uidByte[i], HEX));
+  }
+  Serial.println();
+  Serial.print("Message : ");
+  content.toUpperCase();
+  if (content.substring(1) == "36 E1 24 83") //change here the UID of the card/cards that you want to give access
+  {
+    Serial.println("Authorized access");
+    lcd.clear();
+    lcd.setCursor(0,0);
+    lcd.print("ACCESS GRANTED");
+    Serial.println();
+    myServo.write(180);
+    delay(5000);
+    myServo.write(0);
+    lcd.clear();
+    lcd.print("DOOR IS CLOSED");
+    lcd.setCursor(0,1);
+    lcd.print("RFID OR PASSWORD");
+  }
+ 
+ else   {
+    Serial.println(" Access denied");
+    lcd.setCursor(0,0);
+    lcd.print("ACCESS DENIED");
+    lcd.setCursor(0,1);
+    lcd.print("RFID OR PASSWORD");
+  }
+  }
+
+}
