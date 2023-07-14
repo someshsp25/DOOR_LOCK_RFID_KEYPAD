@@ -6,4 +6,3 @@ The system enables secure access control by integrating both RFID and keypad aut
 Users can gain entry by either scanning their authorized RFID card or entering a valid code using the keypad.
 The ESP32 microcontroller processes the input data, validates it against pre-programmed credentials, and triggers the door lock mechanism if the authentication is successful. 
 The Arduino IDE is utilized for programming the ESP32 and controlling the hardware components.
-This project showcases my proficiency in embedded systems development, RFID technology integration, and Arduino programming.
